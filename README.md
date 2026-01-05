@@ -1,7 +1,3 @@
-Here is a professional, developer-ready `README.md` for your project. It highlights the advanced tech stack (Fabric.js + Socket.io) and makes the project look impressive to anyone visiting your GitHub profile.
-
-Create a file named **`README.md`** in your project folder and paste this code inside.
-
 ```markdown
 # 🎨 Real-Time Jamboard Pro
 
