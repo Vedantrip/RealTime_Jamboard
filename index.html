@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jamboard Pro</title>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+  
+  <style>
+    :root { --primary: #1a73e8; --bg: #f8f9fa; --surface: #ffffff; }
+    body { margin: 0; overflow: hidden; background: var(--bg); font-family: 'Roboto', sans-serif; }
+
+    /* UI */
+    .top-bar { position: fixed; top: 0; width: 100%; padding: 12px 24px; display: flex; justify-content: space-between; pointer-events: none; z-index: 100; }
+    .jam-title, .actions, .slide-controls { pointer-events: auto; background: var(--surface); padding: 8px 16px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; gap: 10px; align-items: center; }
+    
+    .toolbar { position: fixed; left: 20px; top: 50%; transform: translateY(-50%); background: white; padding: 8px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 8px; z-index: 100; }
+    
+    .tool-btn { width: 44px; height: 44px; border: none; background: transparent; border-radius: 8px; cursor: pointer; font-size: 22px; color: #5f6368; }
+    .tool-btn:hover { background: #f1f3f4; }
+    .tool-btn.active { background: #e8f0fe; color: var(--primary); }
+
+    /* LOGIN */
+    #login-screen { position: fixed; inset: 0; z-index: 2000; background: #fff; display: flex; align-items: center; justify-content: center; }
+    .login-card { padding: 40px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 350px; }
+    input { width: 100%; padding: 12px; margin-bottom: 12px; border: 1px solid #ddd; border-radius: 8px; }
+    button.primary { background: var(--primary); color: white; padding: 12px; border: none; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; }
+
+    /* CURSORS */
+    #cursor-layer { position: fixed; inset: 0; pointer-events: none; z-index: 999; }
+    .cursor { position: absolute; transition: transform 0.1s linear; pointer-events: none; }
+    .cursor-label { background: var(--primary); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 12px; white-space: nowrap; }
+    
+    /* ZOOM BUTTONS */
+    .zoom-controls { position: fixed; bottom: 20px; right: 20px; display: flex; gap: 8px; pointer-events: auto; }
+    .zoom-btn { background: white; border: none; padding: 8px 12px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+  <div id="login-screen">
+    <div class="login-card">
+      <h1>Jamboard Pro</h1>
+      <input id="name-input" placeholder="Your Name" value="User 1">
+      <input id="room-input" placeholder="Room Name" value="Apple">
+      <button class="primary" onclick="joinRoom()">Join Session</button>
+    </div>
+  </div>
+
+  <div id="app" style="display:none;">
+    <div class="top-bar">
+      <div class="jam-title">Untitled Jam</div>
+      <div class="slide-controls">
+        <button onclick="changeSlide(-1)">❮</button>
+        <span id="slide-indicator" style="min-width: 30px; text-align: center;">1</span>
+        <button onclick="changeSlide(1)">❯</button>
+      </div>
+      <div class="actions">
+        <button onclick="zoomToFit()" title="Fit to Screen"><i class="ph-bold ph-corners-out"></i> Fit</button>
+        <button onclick="deleteSelected()" title="Delete"><i class="ph-bold ph-trash"></i></button>
+        <button onclick="clearBoard()" style="color:red;">Clear</button>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <button id="btn-select" class="tool-btn active" onclick="setTool('select')"><i class="ph-fill ph-cursor"></i></button>
+      <button id="btn-pen" class="tool-btn" onclick="setTool('pen')"><i class="ph-fill ph-pen-nib"></i></button>
+      <button id="btn-sticky" class="tool-btn" onclick="addSticky()"><i class="ph-fill ph-sticky-note"></i></button>
+      <button id="btn-text" class="tool-btn" onclick="addText()"><i class="ph-fill ph-text-t"></i></button>
+      <button id="btn-rect" class="tool-btn" onclick="addShape('rect')"><i class="ph-fill ph-square"></i></button>
+    </div>
+
+    <div id="cursor-layer"></div>
+    
+    <div style="position: absolute; top:0; left:0; width:100%; height:100%; background-image: radial-gradient(#ccc 1px, transparent 1px); background-size: 20px 20px;">
+      <canvas id="c"></canvas>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    let canvas; 
+    let currentRoom = "", userName = "Guest", slide = 1;
+    let isReceivingUpdate = false; 
+
+    function joinRoom() {
+      currentRoom = document.getElementById('room-input').value;
+      userName = document.getElementById('name-input').value;
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      
+      initCanvas();
+      socket.emit('join_room', currentRoom);
+    }
+
+    function initCanvas() {
+      canvas = new fabric.Canvas('c', { width: window.innerWidth, height: window.innerHeight, backgroundColor: null });
+      window.addEventListener('resize', () => { canvas.setWidth(window.innerWidth); canvas.setHeight(window.innerHeight); });
+
+      // --- ZOOM & PAN LOGIC ---
+      canvas.on('mouse:wheel', function(opt) {
+        var delta = opt.e.deltaY;
+        var zoom = canvas.getZoom();
+        zoom *= 0.999 ** delta;
+        if (zoom > 5) zoom = 5; if (zoom < 0.1) zoom = 0.1;
+        canvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom);
+        opt.e.preventDefault(); opt.e.stopPropagation();
+      });
+
+      let isDragging = false, lastX, lastY;
+      canvas.on('mouse:down', function(opt) {
+        if (opt.e.altKey === true || opt.e.button === 1) {
+          isDragging = true; canvas.selection = false; lastX = opt.e.clientX; lastY = opt.e.clientY;
+        }
+      });
+      canvas.on('mouse:move', function(opt) {
+        if (isDragging) {
+          var vpt = canvas.viewportTransform;
+          vpt[4] += opt.e.clientX - lastX; vpt[5] += opt.e.clientY - lastY;
+          canvas.requestRenderAll(); lastX = opt.e.clientX; lastY = opt.e.clientY;
+        }
+        // Send Cursor
+        const ptr = canvas.getPointer(opt.e);
+        socket.emit('cursor_move', { room: currentRoom, user: userName, x: ptr.x, y: ptr.y });
+      });
+      canvas.on('mouse:up', function() { isDragging = false; canvas.selection = true; });
+
+      // --- OBJECT EVENTS ---
+      canvas.on('object:modified', (e) => {
+        socket.emit('object:update', { room: currentRoom, slide: slide, id: e.target.id, data: e.target.toJSON(['id']) });
+      });
+      canvas.on('object:added', (e) => {
+        if (!isReceivingUpdate) {
+          if(!e.target.id) e.target.set('id', Date.now() + '-' + Math.random());
+          socket.emit('object:add', { room: currentRoom, slide: slide, data: e.target.toJSON(['id']) });
+        }
+      });
+      canvas.on('object:removed', (e) => {
+        if (!isReceivingUpdate) socket.emit('object:remove', { room: currentRoom, slide: slide, id: e.target.id });
+      });
+      canvas.on('path:created', (e) => { e.path.set('id', Date.now() + '-' + Math.random()); });
+    }
+
+    // --- NEW: AUTO ZOOM TO FIT ---
+    function zoomToFit() {
+      const objects = canvas.getObjects();
+      if (objects.length === 0) {
+        canvas.setViewportTransform([1, 0, 0, 1, 0, 0]); // Reset to center if empty
+        return;
+      }
+      
+      // Calculate bounding box of everything
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      objects.forEach(o => {
+        if(o.left < minX) minX = o.left;
+        if(o.top < minY) minY = o.top;
+        if(o.left + o.width * o.scaleX > maxX) maxX = o.left + o.width * o.scaleX;
+        if(o.top + o.height * o.scaleY > maxY) maxY = o.top + o.height * o.scaleY;
+      });
+
+      const width = maxX - minX;
+      const height = maxY - minY;
+      
+      // Add some padding
+      const padding = 100;
+      const scaleX = (canvas.width - padding * 2) / width;
+      const scaleY = (canvas.height - padding * 2) / height;
+      const scale = Math.min(scaleX, scaleY, 1); // Don't zoom in past 100%
+
+      // Center it
+      const vpt = canvas.viewportTransform;
+      vpt[0] = scale; vpt[3] = scale;
+      vpt[4] = (canvas.width - width * scale) / 2 - minX * scale;
+      vpt[5] = (canvas.height - height * scale) / 2 - minY * scale;
+      canvas.requestRenderAll();
+    }
+
+    // --- SOCKET SYNC ---
+    socket.on('load_slide', (data) => {
+      isReceivingUpdate = true;
+      slide = data.slide;
+      document.getElementById('slide-indicator').innerText = slide;
+      
+      canvas.clear();
+      // Ensure background is transparent so grid shows
+      canvas.backgroundColor = null; 
+      
+      fabric.util.enlivenObjects(data.history, (objs) => {
+        objs.forEach((o) => canvas.add(o));
+        isReceivingUpdate = false;
+        
+        // AUTO ZOOM TO CONTENT ON LOAD
+        setTimeout(zoomToFit, 100);
+      });
+    });
+
+    socket.on('object:add', (data) => { if(data.slide===slide) { isReceivingUpdate=true; fabric.util.enlivenObjects([data.data],(o)=>{canvas.add(o[0]); isReceivingUpdate=false;}); }});
+    socket.on('object:update', (data) => { if(data.slide===slide) { isReceivingUpdate=true; const o=canvas.getObjects().find(obj=>obj.id===data.id); if(o){o.set(data.data); o.setCoords(); canvas.requestRenderAll();} isReceivingUpdate=false; }});
+    socket.on('object:remove', (data) => { if(data.slide===slide) { isReceivingUpdate=true; const o=canvas.getObjects().find(obj=>obj.id===data.id); if(o)canvas.remove(o); isReceivingUpdate=false; }});
+    socket.on('clear_board', () => { isReceivingUpdate=true; canvas.clear(); isReceivingUpdate=false; });
+    
+    // Cursor Sync
+    socket.on('cursor_update', (d) => {
+      const l = document.getElementById('cursor-layer');
+      let c = document.getElementById(`cur-${d.id}`);
+      if (!c) { c = document.createElement('div'); c.id = `cur-${d.id}`; c.className = 'cursor'; c.innerHTML = `<i class="ph-fill ph-cursor" style="color:#1a73e8; font-size:24px; transform:rotate(-20deg);"></i><span class="cursor-label">${d.user}</span>`; l.appendChild(c); }
+      const p = fabric.util.transformPoint({x:d.x, y:d.y}, canvas.viewportTransform);
+      c.style.transform = `translate(${p.x}px, ${p.y}px)`;
+    });
+
+    // --- TOOLS ---
+    function setTool(t) { canvas.isDrawingMode=(t==='pen'); if(t==='pen'){canvas.freeDrawingBrush.width=4; canvas.freeDrawingBrush.color="black";} document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active')); document.getElementById('btn-'+t).classList.add('active'); }
+    function addSticky() { const center = canvas.getVpCenter(); const note = new fabric.Group([new fabric.Rect({width:150,height:150,fill:'#fbbc04'}), new fabric.Textbox('Type',{fontSize:20,width:130,top:20,left:10})], {left:center.x-75,top:center.y-75}); canvas.add(note); canvas.setActiveObject(note); }
+    function addText() { const center = canvas.getVpCenter(); canvas.add(new fabric.IText('Text', {left:center.x,top:center.y})); }
+    function addShape(t) { const center = canvas.getVpCenter(); canvas.add(new fabric.Rect({width:100,height:100,fill:'transparent',stroke:'blue',strokeWidth:3,left:center.x,top:center.y})); }
+    function deleteSelected() { canvas.getActiveObjects().forEach((o)=>canvas.remove(o)); }
+    function clearBoard() { if(confirm('Clear?')) { canvas.clear(); socket.emit('clear_board', {room:currentRoom, slide:slide}); } }
+    function changeSlide(dir) { const next = slide + dir; if(next>0) socket.emit('change_slide', {room:currentRoom, slide:next}); }
+  </script>
+</body>
+</html>
