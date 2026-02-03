@@ -16,6 +16,7 @@
       --primary-hover: #1d4ed8;
       --bg-color: #f8fafc;
       --surface: #ffffff;
+      --surface-muted: rgba(255, 255, 255, 0.9);
       --text-main: #0f172a;
       --text-sub: #64748b;
       --border: #e2e8f0;
@@ -25,7 +26,13 @@
     }
 
     * { box-sizing: border-box; outline: none; user-select: none; }
-    body { margin: 0; overflow: hidden; background: var(--bg-color); font-family: 'Inter', sans-serif; color: var(--text-main); }
+    body { 
+      margin: 0; 
+      overflow: hidden; 
+      background: radial-gradient(circle at top, #f8fafc 0%, #e2e8f0 100%); 
+      font-family: 'Inter', sans-serif; 
+      color: var(--text-main); 
+    }
 
     /* --- 1. NEW LOGIN SCREEN (The Revamp) --- */
     #login-screen {
@@ -54,7 +61,7 @@
       border-radius: 24px;
       box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
       text-align: center;
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.4);
       animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
@@ -82,6 +89,7 @@
     }
     .login-input:focus { background: white; border-color: var(--primary); box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1); }
     .login-input:focus + i { color: var(--primary); }
+    .login-input::placeholder { color: #94a3b8; }
 
     .login-btn {
       width: 100%; padding: 16px; margin-top: 8px;
@@ -103,36 +111,56 @@
       position: fixed; top: 0; left: 0; right: 0; padding: 16px 24px;
       display: flex; justify-content: space-between; align-items: center;
       pointer-events: none; z-index: 100;
+      gap: 16px;
     }
     
     .jam-title { 
-      pointer-events: auto; background: white; padding: 10px 16px; border-radius: 12px;
-      font-weight: 600; display: flex; align-items: center; gap: 10px; 
-      box-shadow: var(--shadow-lg); border: 1px solid var(--border); font-size: 15px;
+      pointer-events: auto; background: var(--surface-muted); padding: 10px 16px; border-radius: 14px;
+      font-weight: 600; display: flex; align-items: center; gap: 12px; 
+      box-shadow: var(--shadow-lg); border: 1px solid rgba(148,163,184,0.35); font-size: 15px;
+      backdrop-filter: blur(12px);
+    }
+
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+      background: rgba(16, 185, 129, 0.12); color: #047857;
+    }
+    .status-pill::before {
+      content: ""; width: 6px; height: 6px; border-radius: 999px; background: #10b981;
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
     }
     
     .slide-controls {
-      pointer-events: auto; background: white; border-radius: 99px;
-      box-shadow: var(--shadow-lg); display: flex; align-items: center; padding: 4px; border: 1px solid var(--border);
+      pointer-events: auto; background: var(--surface-muted); border-radius: 99px;
+      box-shadow: var(--shadow-lg); display: flex; align-items: center; padding: 4px; border: 1px solid rgba(148,163,184,0.35);
+      backdrop-filter: blur(12px);
     }
     .slide-btn { background: transparent; border: none; width: 36px; height: 36px; cursor: pointer; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
     .slide-btn:hover { background: var(--bg-color); }
     
-    .actions { pointer-events: auto; display: flex; gap: 8px; }
+    .actions { 
+      pointer-events: auto; display: flex; gap: 8px; padding: 6px;
+      background: var(--surface-muted); border-radius: 14px; border: 1px solid rgba(148,163,184,0.35);
+      box-shadow: var(--shadow-lg); backdrop-filter: blur(12px);
+    }
     .action-btn {
-      background: white; border: 1px solid var(--border); padding: 10px 16px;
-      border-radius: 10px; box-shadow: var(--shadow-sm); cursor: pointer;
+      background: transparent; border: 1px solid transparent; padding: 10px 14px;
+      border-radius: 10px; cursor: pointer;
       font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px;
       transition: 0.2s; color: var(--text-main);
     }
-    .action-btn:hover { background: var(--bg-color); transform: translateY(-1px); }
+    .action-btn:hover { background: rgba(248, 250, 252, 0.9); border-color: var(--border); transform: translateY(-1px); }
+    .action-btn.danger { color:#ef4444; }
+    .action-btn.danger:hover { background: rgba(254, 226, 226, 0.8); border-color: rgba(248, 113, 113, 0.4); }
 
     /* TOOLBAR */
     .toolbar {
       position: fixed; left: 24px; top: 50%; transform: translateY(-50%);
-      background: white; padding: 8px; border-radius: 16px;
+      background: var(--surface-muted); padding: 10px; border-radius: 18px;
       box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 8px;
-      z-index: 100; border: 1px solid var(--border);
+      z-index: 100; border: 1px solid rgba(148,163,184,0.35);
+      backdrop-filter: blur(12px);
     }
     .tool-btn {
       width: 48px; height: 48px; border: none; background: transparent;
@@ -140,7 +168,7 @@
       display: flex; align-items: center; justify-content: center;
       font-size: 22px; transition: 0.2s;
     }
-    .tool-btn:hover { background: #eff6ff; color: var(--primary); }
+    .tool-btn:hover { background: rgba(37, 99, 235, 0.1); color: var(--primary); }
     .tool-btn.active { background: var(--primary); color: white; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); }
 
     /* CANVAS & LAYERS */
@@ -152,7 +180,14 @@
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
-    #canvas-wrap { position: absolute; top:0; left:0; width:100%; height:100%; background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px); background-size: 24px 24px; }
+    #canvas-wrap { 
+      position: absolute; top:0; left:0; width:100%; height:100%;
+      background-image:
+        radial-gradient(#cbd5e1 1.5px, transparent 1.5px),
+        linear-gradient(135deg, rgba(248, 250, 252, 0.8), rgba(226, 232, 240, 0.6));
+      background-size: 24px 24px, 100% 100%;
+      background-position: 0 0, center;
+    }
   </style>
 </head>
 <body>
@@ -184,6 +219,7 @@
       <div class="jam-title">
         <i class="ph-fill ph-shapes" style="color:var(--primary)"></i>
         <span>Untitled Board</span>
+        <span class="status-pill">Live</span>
       </div>
       <div class="slide-controls">
         <button class="slide-btn" onclick="changeSlide(-1)"><i class="ph-bold ph-caret-left"></i></button>
@@ -192,8 +228,8 @@
       </div>
       <div class="actions">
         <button class="action-btn" onclick="zoomToFit()"><i class="ph-bold ph-corners-out"></i> Fit</button>
-        <button class="action-btn" onclick="deleteSelected()" style="color:#ef4444;"><i class="ph-bold ph-trash"></i></button>
-        <button class="action-btn" onclick="clearBoard()" style="color:#ef4444;">Clear</button>
+        <button class="action-btn danger" onclick="deleteSelected()"><i class="ph-bold ph-trash"></i></button>
+        <button class="action-btn danger" onclick="clearBoard()">Clear</button>
       </div>
     </div>
 
